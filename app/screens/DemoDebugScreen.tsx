@@ -1,11 +1,12 @@
-import React, { FC } from "react"
+import React, { FC, useState, useEffect } from "react"
 import * as Application from "expo-application"
-import { Linking, Platform, TextStyle, View, ViewStyle } from "react-native"
+import { Linking, Platform, TextStyle, View, ViewStyle, Switch } from "react-native"
 import { Button, ListItem, Screen, Text } from "../components"
 import { DemoTabScreenProps } from "../navigators/DemoNavigator"
 import { colors, spacing } from "../theme"
-import { isRTL } from "../i18n"
+import { isRTL, setLocale } from "../i18n"
 import { useStores } from "../models"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 
 /**
  * @param {string} url - The URL to open in the browser.
@@ -21,6 +22,26 @@ export const DemoDebugScreen: FC<DemoTabScreenProps<"DemoDebug">> = function Dem
   const {
     authenticationStore: { logout },
   } = useStores()
+
+  const [isArabic, setIsArabic] = useState(isRTL)
+
+  useEffect(() => {
+    const getStoredLocale = async () => {
+      const locale = await AsyncStorage.getItem("appLocale")
+      if (locale === "ar") {
+        setIsArabic(true)
+      } else {
+        setIsArabic(false)
+      }
+    }
+    getStoredLocale()
+  }, [])
+
+  const handleLanguageToggle = async () => {
+    const newLocale = isArabic ? "en" : "ar"
+    await setLocale(newLocale)
+    setIsArabic(!isArabic)
+  }
 
   const usingHermes = typeof HermesInternal === "object" && HermesInternal !== null
   // @ts-expect-error
@@ -103,6 +124,11 @@ export const DemoDebugScreen: FC<DemoTabScreenProps<"DemoDebug">> = function Dem
           }
         />
       </View>
+      <View style={$languageToggleContainer}>
+        <Text>Arabic</Text>
+        <Switch value={isArabic} onValueChange={handleLanguageToggle} />
+        <Text>English</Text>
+      </View>
       <View style={$buttonContainer}>
         <Button style={$button} tx="demoDebugScreen.reactotron" onPress={demoReactotron} />
         <Text style={$hint} tx={`demoDebugScreen.${Platform.OS}ReactotronHint` as const} />
@@ -135,6 +161,13 @@ const $item: ViewStyle = {
 }
 
 const $itemsContainer: ViewStyle = {
+  marginBottom: spacing.xl,
+}
+
+const $languageToggleContainer: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
   marginBottom: spacing.xl,
 }
 

@@ -1,6 +1,8 @@
 import * as Localization from "expo-localization"
 import { I18n } from "i18n-js"
-import { I18nManager } from "react-native"
+import { I18nManager, Platform } from "react-native"
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import * as Updates from 'expo-updates'
 
 // if English isn't your default language, move Translations to the appropriate language file.
 import en, { Translations } from "./en"
@@ -20,26 +22,53 @@ export const i18n = new I18n(
   { locale: fallbackLocale, defaultLocale: fallbackLocale, enableFallback: true },
 )
 
-const systemLocale = Localization.getLocales()[0]
-const systemLocaleTag = systemLocale?.languageTag ?? fallbackLocale
+export let isRTL = false;
 
-if (Object.prototype.hasOwnProperty.call(i18n.translations, systemLocaleTag)) {
-  // if specific locales like en-FI or en-US is available, set it
-  i18n.locale = systemLocaleTag
-} else {
-  // otherwise try to fallback to the general locale (dropping the -XX suffix)
-  const generalLocale = systemLocaleTag.split("-")[0]
-  if (Object.prototype.hasOwnProperty.call(i18n.translations, generalLocale)) {
-    i18n.locale = generalLocale
-  } else {
-    i18n.locale = fallbackLocale
+const getLocale = async () => {
+  let locale = await AsyncStorage.getItem("appLocale")
+  if (!locale) {
+    const systemLocale = Localization.getLocales()[0]
+    locale = systemLocale?.languageTag ?? fallbackLocale
+    await AsyncStorage.setItem("appLocale", locale)
   }
+  return locale
 }
 
-// handle RTL languages
-export const isRTL = systemLocale?.textDirection === "rtl"
-I18nManager.allowRTL(isRTL)
-I18nManager.forceRTL(isRTL)
+getLocale().then((locale) => {
+  if (Object.prototype.hasOwnProperty.call(i18n.translations, locale)) {
+    // if specific locales like en-FI or en-US is available, set it
+    i18n.locale = locale
+  } else {
+    // otherwise try to fallback to the general locale (dropping the -XX suffix)
+    const generalLocale = locale.split("-")[0]
+    if (Object.prototype.hasOwnProperty.call(i18n.translations, generalLocale)) {
+      i18n.locale = generalLocale
+    } else {
+      i18n.locale = fallbackLocale
+    }
+  }
+
+  // handle RTL languages
+  isRTL = ['ar', 'he', 'fa', 'ur'].includes(locale)
+  I18nManager.allowRTL(isRTL)
+  I18nManager.forceRTL(isRTL)
+})
+
+export const setLocale = async (locale: string) => {
+  await AsyncStorage.setItem("appLocale", locale)
+  i18n.locale = locale
+  isRTL = ['ar', 'he', 'fa', 'ur'].includes(locale)
+  I18nManager.allowRTL(isRTL)
+  I18nManager.forceRTL(isRTL)
+  // Reload the app to apply changes
+  setTimeout(() => {
+    if (Platform.select({ ios: 'ios', android: 'android', default: 'unknown' }) === 'android') {
+      RNRestart.Restart()
+    } else {
+      Updates.reloadAsync()
+    }
+  }, 500)
+}
 
 /**
  * Builds up valid keypaths for translations.
